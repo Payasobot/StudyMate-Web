@@ -1,34 +1,209 @@
 <!DOCTYPE html>
-<html lang="tl">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎯 StudyMate Dashboard</title>
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
-      background: #f9fafb;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f9f9f9;
+      color: #222;
       margin: 0;
-      padding: 0;
+      padding: 20px;
+      transition: 0.3s;
     }
-    header {
-      background: #2563eb;
-      color: white;
-      padding: 15px;
+    .dark-mode {
+      background-color: #121212;
+      color: #f9f9f9;
+    }
+    h1 {
       text-align: center;
     }
-    .container {
+    .section {
+      background: #fff;
+      margin: 20px auto;
       padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 600px;
+    }
+    .dark-mode .section {
+      background: #1e1e1e;
+      box-shadow: 0 2px 10px rgba(255,255,255,0.1);
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover { background: #0056b3; }
+    .assignment, .note {
+      background: #e9ecef;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .dark-mode .assignment, .dark-mode .note {
+      background: #333;
+    }
+    #quote {
+      font-style: italic;
+      text-align: center;
+      margin-top: 10px;
+      color: #555;
+    }
+    .dark-mode #quote {
+      color: #aaa;
+    }
+    #logout {
+      background: crimson;
+      float: right;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h2>🎯 StudyMate Dashboard</h2>
-  </header>
-  <div class="container">
-    <p>Welcome to your private dashboard! 🧠</p>
-    <p>Here you can manage your assignments, reminders, and diary entries soon.</p>
+  <h1>🎯 StudyMate Dashboard</h1>
+  <button id="darkToggle">🌙 Toggle Dark Mode</button>
+  <button id="logout">Logout</button>
+
+  <!-- Quote Section -->
+  <div class="section">
+    <h2>💡 Study Motivation</h2>
+    <p id="quote"></p>
   </div>
+
+  <!-- Assignments Section -->
+  <div class="section">
+    <h2>📚 Assignments Reminder</h2>
+    <input type="text" id="assignmentTitle" placeholder="Assignment Title">
+    <input type="date" id="assignmentDate">
+    <button id="addAssignment">Add</button>
+    <div id="assignmentsList"></div>
+  </div>
+
+  <!-- Diary Section -->
+  <div class="section">
+    <h2>📖 My Daily Notes</h2>
+    <textarea id="noteText" rows="3" placeholder="Write something..."></textarea>
+    <button id="saveNote">Save Note</button>
+    <div id="notesList"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC3T8yH3nbrRnoiHkW_nLTOSEN2c3Izzbw",
+      authDomain: "studyapp-ea619.firebaseapp.com",
+      projectId: "studyapp-ea619",
+      storageBucket: "studyapp-ea619.firebasestorage.app",
+      messagingSenderId: "163403718779",
+      appId: "1:163403718779:web:23636dbda1f913db8942de"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const addBtn = document.getElementById("addAssignment");
+    const listDiv = document.getElementById("assignmentsList");
+    const noteBtn = document.getElementById("saveNote");
+    const notesDiv = document.getElementById("notesList");
+    const logoutBtn = document.getElementById("logout");
+
+    // Dark Mode Toggle
+    document.getElementById("darkToggle").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+    });
+
+    // Quotes List
+    const quotes = [
+      "Study hard, stay humble.",
+      "Small steps every day lead to big success.",
+      "Your future is created by what you do today.",
+      "Focus on progress, not perfection.",
+      "Dream big. Work hard. Stay kind."
+    ];
+    document.getElementById("quote").innerText = quotes[Math.floor(Math.random() * quotes.length)];
+
+    // Check if logged in
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "index.html";
+      } else {
+        // Load assignments
+        const q = query(collection(db, "assignments"), where("uid", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.classList.add("assignment");
+          div.innerText = `${data.title} - Due: ${data.date}`;
+          listDiv.appendChild(div);
+        });
+
+        // Load notes
+        const nq = query(collection(db, "notes"), where("uid", "==", user.uid));
+        const nSnap = await getDocs(nq);
+        nSnap.forEach((doc) => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.classList.add("note");
+          div.innerText = data.text;
+          notesDiv.appendChild(div);
+        });
+      }
+    });
+
+    // Add Assignment
+    addBtn.addEventListener("click", async () => {
+      const title = document.getElementById("assignmentTitle").value;
+      const date = document.getElementById("assignmentDate").value;
+      const user = auth.currentUser;
+      if (!title || !date || !user) return alert("Please fill in all fields");
+      await addDoc(collection(db, "assignments"), {
+        uid: user.uid,
+        title,
+        date
+      });
+      alert("Assignment added!");
+      location.reload();
+    });
+
+    // Save Note
+    noteBtn.addEventListener("click", async () => {
+      const text = document.getElementById("noteText").value;
+      const user = auth.currentUser;
+      if (!text || !user) return alert("Please write something");
+      await addDoc(collection(db, "notes"), {
+        uid: user.uid,
+        text
+      });
+      alert("Note saved!");
+      location.reload();
+    });
+
+    // Logout
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "index.html";
+    });
+  </script>
 </body>
 </html>
+
